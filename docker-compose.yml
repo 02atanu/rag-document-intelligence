@@ -1,0 +1,35 @@
+services:
+  # Your FastAPI Application
+  api:
+    build: .
+    container_name: rag_api
+    ports:
+      - "8000:8000"
+    # Loads your GEMINI_API_KEY from your local file
+    env_file:
+      - .env  
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=rag_db
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+    depends_on:
+      - postgres
+
+  # Postgres Vector Database
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: pgvector-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: rag_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
