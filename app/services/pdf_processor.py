@@ -8,13 +8,13 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 def clean_text(text: str) -> str:
     """Extra whitespace, newlines, messy pdf character removal"""
-
+    # Replacing whitespace characters 
     text = re.sub(r'\s+',' ', text)
     return text.strip()
 
 def process_pdf(file_bytes: bytes, filename: str) -> list:
     """saves uploaded bytes, extracts text and cleans it and finally chunks it"""
-
+    # Creates a temporary file in memory
     with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
         temp_file.write(file_bytes)
         temp_path = temp_file.name
