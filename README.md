@@ -1,58 +1,36 @@
-# Enterprise Document Intelligence Engine: Production-Grade RAG Pipeline
+# RAG Document Intelligence API
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-v0.110.0-green.svg)](https://fastapi.tiangolo.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-pgvector--v17-blue.svg)](https://www.postgresql.org/)
 [![Docker](https://img.shields.io/badge/Docker-Orchestrated-blue.svg)](https://www.docker.com/)
 
-An enterprise-ready, fully containerized Retrieval-Augmented Generation (RAG) backend engine designed to ingest unstructured documents, perform deterministic semantic chunking, and execute context-aware synthesis using Google's Gemini 2.5 Flash and PostgreSQL (`pgvector`). 
+A containerized Retrieval-Augmented Generation (RAG) backend. This system ingests PDF documents, chunks the text, stores the embeddings in PostgreSQL using `pgvector`, and uses Google's Gemini 2.5 Flash to answer questions based strictly on the uploaded context.
 
-This architecture is optimized for low-latency retrieval, zero-temperature factual generation, and mathematically rigorous vector space management.
+The architecture is built for speed and data hygiene, utilizing asynchronous endpoints and deterministic hashing to prevent database bloat.
 
 ---
 
-## 🏗️ Architectural Topology & System Design
+## ⚡ Core Features
 
-The system decouples the data-ingestion pipeline from the real-time inference loop, ensuring independent horizontal scalability for both database writes and LLM reads.
+* **Async FastAPI Backend:** File parsing and vector math are handled without blocking the main event loop, allowing the API to handle concurrent requests smoothly.
+* **Idempotent Data Ingestion:** Uses MD5 hashing on document names and text chunks. If you upload the same PDF twice, the database ignores the duplicate, saving compute costs and preventing vector space pollution.
+* **HNSW Vector Indexing:** Uses a Hierarchical Navigable Small World (HNSW) index in Postgres. This keeps semantic search times incredibly fast ($O(\log N)$) even if the database scales to millions of document chunks.
+* **Fully Dockerized:** The API and Vector Database run in isolated containers on an internal bridge network, meaning it works out-of-the-box on any machine without local dependency conflicts.
+
+---
+
+## 🏗️ System Architecture
 
 ```mermaid
 graph TD
-    %% Define Styles for Professional Look
+    %% Define Styles
     classDef client fill:#f9f9f9,stroke:#333,stroke-width:2px,color:#333;
     classDef api fill:#005f73,stroke:#fff,stroke-width:2px,color:#fff;
     classDef core fill:#0a9396,stroke:#fff,stroke-width:2px,color:#fff;
     classDef db fill:#94d2bd,stroke:#333,stroke-width:2px,color:#333;
 
-    %% Nodes Configuration
-    Client[Client / UI Workspace] ::: client
-    API[FastAPI Ingestion API <br><i>Async Event Loop</i>] ::: api
-    LC[LangChain Engine Core <br><i>Text Chunking Pipeline</i>] ::: core
-    Gemini[Google Gemini API <br><i>gemini-embedding-001</i>] ::: core
-    DB[(PostgreSQL + pgvector <br><i>HNSW Inverted Index Layer</i>)] ::: db
-
-    %% Structural Relationships
-    Client -->|Ingress Port 8000| API
-    
-    subgraph Isolated Docker Bridge Network
-        API -->|1. Document Payload| LC
-        API -->|2. Semantic Query| Gemini
-        LC -->|3. Normalized Chunks| DB
-        Gemini -->|4. 768-Dim Vector Arrays| DB
-    end
-
-    DB -.->|Egress Mapping Port 5433| Client
-
-### System Data Flow
-
-```mermaid
-graph TD
-    %% Define Styles for Professional Look
-    classDef client fill:#f9f9f9,stroke:#333,stroke-width:2px,color:#333;
-    classDef api fill:#005f73,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef core fill:#0a9396,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef db fill:#94d2bd,stroke:#333,stroke-width:2px,color:#333;
-
-    %% Nodes Configuration (Wrapped in quotes for GitHub safety)
+    %% Nodes Configuration 
     Client["Client / UI Workspace"] ::: client
     API["FastAPI Ingestion API <br>Async Event Loop"] ::: api
     LC["LangChain Engine Core <br>Text Chunking Pipeline"] ::: core
@@ -70,46 +48,61 @@ graph TD
     end
 
     DB -.->|"Egress Mapping Port 5433"| Client
-
-### Core Engineering Features
-* **Asynchronous Execution (`FastAPI`):** Non-blocking I/O operations utilize Python's native event loop to process file transformations without degrading server performance during concurrent client connections.
-* **Deterministic Hashing & Idempotency:** Implements an MD5 hashing layer (`hashlib.md5`) matching structural payloads (Filename + Sequence Text). If duplicate documents or chunks are re-submitted, the system enforces a database-level upsert restriction, mitigating vector space pollution and redundant compute costs.
-* **Network Isolation via Docker Compose:** The application stack is isolated across an internal bridge network. The API communicates with the database natively via internal port `5432`, while the external host port is mapped to `5433` to completely prevent conflicts with local database installations.
+```
 
 ---
 
-## 🧮 Mathematical Rigor & Vector Space Optimization
+## 🧮 How the Vector Search Works (Under the Hood)
 
-Rather than using basic keyword mapping, this engine relies on geometric distance metrics in high-dimensional space. Text chunks are mapped using `gemini-embedding-001` into a 768-dimensional vector space ($\mathbb{R}^{768}$).
+Instead of relying on simple keyword matching (like a standard SQL `LIKE` query), this engine maps text chunks into a 768-dimensional mathematical space using `gemini-embedding-001`. 
 
-### Semantic Match Calculation
-The retrieval mechanism isolates highly relevant context by calculating the **Cosine Similarity** between the user query vector $\mathbf{Q}$ and the document chunk vectors $\mathbf{D}$:
+When a user asks a question, the system finds the most relevant document chunks by calculating the **Cosine Similarity** between the question's vector (`Q`) and the document's vector (`D`):
 
 ```math
 \text{Cosine Similarity} = \frac{\mathbf{Q} \cdot \mathbf{D}}{\|\mathbf{Q}\| \|\mathbf{D}\|} = \frac{\sum_{i=1}^{768} Q_i D_i}{\sqrt{\sum_{i=1}^{768} Q_i^2} \sqrt{\sum_{i=1}^{768} D_i^2}}
 ```
 
-By measuring the cosine of the angle between vectors rather than their absolute Euclidean magnitude, the engine evaluates semantic relevance independent of text length variations.
-
-### Inverted Indexing with HNSW
-To guarantee sub-linear $O(\log N)$ query scaling across millions of rows, the database utilizes a **Hierarchical Navigable Small World (HNSW)** index over the vector column, constructing a multi-layer graph that avoids the expensive computation of exhaustive flat searches ($O(N)$).
+Because it measures the angle between vectors rather than the absolute distance, the search engine accurately matches meaning regardless of how long or short the text chunks are.
 
 ---
 
-## 🛠️ Technology Stack & Dependencies
+## 🛠️ Tech Stack
 
-* **Runtime:** Python 3.12+
-* **Framework:** FastAPI (Uvicorn ASGI Server)
-* **AI Orchestration:** LangChain Core & LangChain Community
-* **LLM Architecture:** Google GenAI (`gemini-2.5-flash`, `gemini-embedding-001`)
-* **Vector Storage:** PostgreSQL 17 with `pgvector` extension
+* **Language:** Python 3.12+
+* **Framework:** FastAPI (Uvicorn ASGI)
+* **LLM & Embeddings:** Google Gemini 2.5 Flash / `gemini-embedding-001`
+* **RAG Orchestration:** LangChain
+* **Database:** PostgreSQL 17 + `pgvector`
 * **Infrastructure:** Docker & Docker Compose
 
 ---
 
-## 📦 Local Deployment & Configuration
+## 🚀 Local Setup & Deployment
 
-### 1. Repository Initialization
+### 1. Clone the repository
 ```bash
 git clone [https://github.com/02atanu/rag-document-intelligence.git](https://github.com/02atanu/rag-document-intelligence.git)
 cd rag-document-intelligence
+```
+
+### 2. Add your API Key
+Create a `.env` file in the root directory. Add your database credentials and Google AI Studio API key:
+```env
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_DB=rag_db
+POSTGRES_HOST=postgres
+POSTGRES_PORT=5432
+
+GEMINI_API_KEY=your_actual_api_key_here
+```
+*(Note: `.env` is included in `.gitignore` to keep your keys secure).*
+
+### 3. Boot up the Docker containers
+```bash
+docker compose up --build -d
+```
+The API will be live at `http://localhost:8000`. You can visit `http://localhost:8000/docs` to use the interactive Swagger UI to upload PDFs and query your documents.
+
+### 4. Database Introspection (Optional)
+If you want to view the raw vector embeddings inside your database, connect your preferred SQL client (like DBeaver or VS Code SQLTools) to `localhost:5433` using the credentials in your `.env` file.
