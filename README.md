@@ -46,33 +46,30 @@ graph TD
 
 ```mermaid
 graph TD
-    %% Define Styles
-    classDef client fill:#2a2a2a,stroke:#fff,stroke-width:2px,color:#fff;
+    %% Define Styles for Professional Look
+    classDef client fill:#f9f9f9,stroke:#333,stroke-width:2px,color:#333;
     classDef api fill:#005f73,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef ai fill:#0a9396,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef core fill:#0a9396,stroke:#fff,stroke-width:2px,color:#fff;
     classDef db fill:#94d2bd,stroke:#333,stroke-width:2px,color:#333;
 
-    %% Nodes
-    U[User / Client] ::: client
-    API[FastAPI Gateway :8000] ::: api
-    Split[LangChain Text Splitter] ::: api
-    Embed[Gemini Embedding Model] ::: ai
-    DB[(PostgreSQL + pgvector :5432)] ::: db
-    LLM[Gemini 2.5 Flash LLM] ::: ai
+    %% Nodes Configuration (Wrapped in quotes for GitHub safety)
+    Client["Client / UI Workspace"] ::: client
+    API["FastAPI Ingestion API <br>Async Event Loop"] ::: api
+    LC["LangChain Engine Core <br>Text Chunking Pipeline"] ::: core
+    Gemini["Google Gemini API <br>gemini-embedding-001"] ::: core
+    DB[("PostgreSQL + pgvector <br>HNSW Inverted Index Layer")] ::: db
 
-    %% Ingestion Flow
-    U -- Uploads PDF --> API
-    API -- Async Processing --> Split
-    Split -- Raw Text Chunks --> Embed
-    Embed -- 768-Dim Vectors --> DB
+    %% Structural Relationships
+    Client -->|"Ingress Port 8000"| API
+    
+    subgraph DockerNetwork ["Isolated Docker Bridge Network"]
+        API -->|"1. Document Payload"| LC
+        API -->|"2. Semantic Query"| Gemini
+        LC -->|"3. Normalized Chunks"| DB
+        Gemini -->|"4. 768-Dim Vector Arrays"| DB
+    end
 
-    %% Inference Flow
-    U -- Asks Question --> API
-    API -- Query Text --> Embed
-    Embed -- Vectorized Query --> DB
-    DB -- Cosine Similarity Search --> DB
-    DB -- Top K Context Matches --> LLM
-    LLM -- Generates Grounded Answer --> U
+    DB -.->|"Egress Mapping Port 5433"| Client
 
 ### Core Engineering Features
 * **Asynchronous Execution (`FastAPI`):** Non-blocking I/O operations utilize Python's native event loop to process file transformations without degrading server performance during concurrent client connections.
