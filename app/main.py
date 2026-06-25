@@ -29,7 +29,7 @@ async def upload_document(file: UploadFile = File()):
     
 @app.post('/api/v1/query')
 async def query_document(question: str = Body(..., embed=True)):
-    """Endpoint to ask questiona"""
+    """Endpoint to ask question"""
     try:
         response = ask_question(question=question)
         return response
