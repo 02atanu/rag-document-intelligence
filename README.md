@@ -15,7 +15,7 @@ The architecture is built for speed and data hygiene, utilizing asynchronous end
 
 * **Async FastAPI Backend:** File parsing and vector math are handled without blocking the main event loop, allowing the API to handle concurrent requests smoothly.
 * **Idempotent Data Ingestion:** Uses MD5 hashing on document names and text chunks. If you upload the same PDF twice, the database ignores the duplicate, saving compute costs and preventing vector space pollution.
-* **HNSW Vector Indexing:** Uses a Hierarchical Navigable Small World (HNSW) index in Postgres. This keeps semantic search times incredibly fast ($O(\log N)$) even if the database scales to millions of document chunks.
+* **HNSW Vector Indexing:** Uses a Hierarchical Navigable Small World (HNSW) index in Postgres. This keeps semantic search times incredibly fast ($`O(\log N)`$) even if the database scales to millions of document chunks.
 * **Fully Dockerized:** The API and Vector Database run in isolated containers on an internal bridge network, meaning it works out-of-the-box on any machine without local dependency conflicts.
 
 ---
