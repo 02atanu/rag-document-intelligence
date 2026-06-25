@@ -15,26 +15,64 @@ This architecture is optimized for low-latency retrieval, zero-temperature factu
 
 The system decouples the data-ingestion pipeline from the real-time inference loop, ensuring independent horizontal scalability for both database writes and LLM reads.
 
-[ Client / UI ] 
-          │
-          ▼  (Port 8000)
-┌──────────────────────────────────┐
-│       FastAPI Ingestion API      │◀─── Async Event Loop
-└──────────────────────────────────┘
-   │                        │
-   │ (Text Chunking)        │ (Query Embeddings)
-   ▼                        ▼
-┌──────────────┐        ┌────────────────┐
-│  LangChain   │        │ Google Gemini  │ (gemini-embedding-001)
-│ Engine Core  │        │ Embedding API  │ ───► Outputs 768-Dim Vectors
-└──────────────┘        └────────────────┘
-│                        │
-└───────────┬────────────┘
-▼ (Internal Docker Network)
-┌──────────────────────────────────┐
-│     PostgreSQL + pgvector        │◀─── Exposed via Port 5433
-│   (HNSW Inverted Index Layer)    │
-└──────────────────────────────────┘
+```mermaid
+graph TD
+    %% Define Styles for Professional Look
+    classDef client fill:#f9f9f9,stroke:#333,stroke-width:2px,color:#333;
+    classDef api fill:#005f73,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef core fill:#0a9396,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef db fill:#94d2bd,stroke:#333,stroke-width:2px,color:#333;
+
+    %% Nodes Configuration
+    Client[Client / UI Workspace] ::: client
+    API[FastAPI Ingestion API <br><i>Async Event Loop</i>] ::: api
+    LC[LangChain Engine Core <br><i>Text Chunking Pipeline</i>] ::: core
+    Gemini[Google Gemini API <br><i>gemini-embedding-001</i>] ::: core
+    DB[(PostgreSQL + pgvector <br><i>HNSW Inverted Index Layer</i>)] ::: db
+
+    %% Structural Relationships
+    Client -->|Ingress Port 8000| API
+    
+    subgraph Isolated Docker Bridge Network
+        API -->|1. Document Payload| LC
+        API -->|2. Semantic Query| Gemini
+        LC -->|3. Normalized Chunks| DB
+        Gemini -->|4. 768-Dim Vector Arrays| DB
+    end
+
+    DB -.->|Egress Mapping Port 5433| Client
+
+### System Data Flow
+
+```mermaid
+graph TD
+    %% Define Styles
+    classDef client fill:#2a2a2a,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef api fill:#005f73,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef ai fill:#0a9396,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef db fill:#94d2bd,stroke:#333,stroke-width:2px,color:#333;
+
+    %% Nodes
+    U[User / Client] ::: client
+    API[FastAPI Gateway :8000] ::: api
+    Split[LangChain Text Splitter] ::: api
+    Embed[Gemini Embedding Model] ::: ai
+    DB[(PostgreSQL + pgvector :5432)] ::: db
+    LLM[Gemini 2.5 Flash LLM] ::: ai
+
+    %% Ingestion Flow
+    U -- Uploads PDF --> API
+    API -- Async Processing --> Split
+    Split -- Raw Text Chunks --> Embed
+    Embed -- 768-Dim Vectors --> DB
+
+    %% Inference Flow
+    U -- Asks Question --> API
+    API -- Query Text --> Embed
+    Embed -- Vectorized Query --> DB
+    DB -- Cosine Similarity Search --> DB
+    DB -- Top K Context Matches --> LLM
+    LLM -- Generates Grounded Answer --> U
 
 ### Core Engineering Features
 * **Asynchronous Execution (`FastAPI`):** Non-blocking I/O operations utilize Python's native event loop to process file transformations without degrading server performance during concurrent client connections.
@@ -50,7 +88,9 @@ Rather than using basic keyword mapping, this engine relies on geometric distanc
 ### Semantic Match Calculation
 The retrieval mechanism isolates highly relevant context by calculating the **Cosine Similarity** between the user query vector $\mathbf{Q}$ and the document chunk vectors $\mathbf{D}$:
 
-$$\text{Cosine Similarity} = \frac{\mathbf{Q} \cdot \mathbf{D}}{\|\mathbf{Q}\| \|\mathbf{D}\|} = \frac{\sum_{i=1}^{768} Q_i D_i}{\sqrt{\sum_{i=1}^{768} Q_i^2} \sqrt{\sum_{i=1}^{768} D_i^2}}$$
+```math
+\text{Cosine Similarity} = \frac{\mathbf{Q} \cdot \mathbf{D}}{\|\mathbf{Q}\| \|\mathbf{D}\|} = \frac{\sum_{i=1}^{768} Q_i D_i}{\sqrt{\sum_{i=1}^{768} Q_i^2} \sqrt{\sum_{i=1}^{768} D_i^2}}
+```
 
 By measuring the cosine of the angle between vectors rather than their absolute Euclidean magnitude, the engine evaluates semantic relevance independent of text length variations.
 
