@@ -49,7 +49,7 @@ graph TD;
 
     DB -.->|"Egress Mapping Port 5433"| Client;
 
-##  How the Vector Search Works (Under the Hood)
+##How the Vector Search Works (Under the Hood);
 
 Instead of relying on simple keyword matching (like a standard SQL `LIKE` query), this engine maps text chunks into a 768-dimensional mathematical space using `gemini-embedding-001`. 
 
