@@ -23,7 +23,7 @@ The architecture is built for speed and data hygiene, utilizing asynchronous end
 ## 🏗️ System Architecture
 
 ```mermaid
-graph TD
+graph TD;
     %% Define Styles
     classDef client fill:#f9f9f9,stroke:#333,stroke-width:2px,color:#333;
     classDef api fill:#005f73,stroke:#fff,stroke-width:2px,color:#fff;
@@ -31,26 +31,23 @@ graph TD
     classDef db fill:#94d2bd,stroke:#333,stroke-width:2px,color:#333;
 
     %% Nodes Configuration 
-    Client["Client / UI Workspace"] ::: client
-    API["FastAPI Ingestion API <br>Async Event Loop"] ::: api
-    LC["LangChain Engine Core <br>Text Chunking Pipeline"] ::: core
-    Gemini["Google Gemini API <br>gemini-embedding-001"] ::: core
-    DB[("PostgreSQL + pgvector <br>HNSW Inverted Index Layer")] ::: db
+    Client["Client / UI Workspace"]:::client;
+    API["FastAPI Ingestion API <br>Async Event Loop"]:::api;
+    LC["LangChain Engine Core <br>Text Chunking Pipeline"]:::core;
+    Gemini["Google Gemini API <br>gemini-embedding-001"]:::core;
+    DB[("PostgreSQL + pgvector <br>HNSW Inverted Index Layer")]:::db;
 
     %% Structural Relationships
-    Client -->|"Ingress Port 8000"| API
+    Client -->|"Ingress Port 8000"| API;
     
     subgraph DockerNetwork ["Isolated Docker Bridge Network"]
-        API -->|"1. Document Payload"| LC
-        API -->|"2. Semantic Query"| Gemini
-        LC -->|"3. Normalized Chunks"| DB
-        Gemini -->|"4. 768-Dim Vector Arrays"| DB
-    end
+        API -->|"1. Document Payload"| LC;
+        API -->|"2. Semantic Query"| Gemini;
+        LC -->|"3. Normalized Chunks"| DB;
+        Gemini -->|"4. 768-Dim Vector Arrays"| DB;
+    end;
 
-    DB -.->|"Egress Mapping Port 5433"| Client
-```
-
----
+    DB -.->|"Egress Mapping Port 5433"| Client;
 
 ## 🧮 How the Vector Search Works (Under the Hood)
 
